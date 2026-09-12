@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'agent/**', 'feat/**', 'fix/**']
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    env:
+      QT_VERSION: 6.8.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt (${{ env.QT_VERSION }})
+        run: |
+          pip install aqtinstall
+          aqt install-qt linux desktop "${QT_VERSION}" linux_gcc_64 --outputdir "$HOME/Qt"
+          echo "CMAKE_PREFIX_PATH=$HOME/Qt/${QT_VERSION}/gcc_64" >> "$GITHUB_ENV"
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ libgl1-mesa-dev
+
+      - name: Configure
+        run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
