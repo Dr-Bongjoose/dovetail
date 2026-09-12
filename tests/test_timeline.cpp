@@ -119,6 +119,45 @@ private slots:
         QCOMPARE(m.clipById(idB)->length, qint64(50));
         QCOMPARE(m.clipById(idB)->sourceIn, qint64(30));
     }
+
+    // --- validation: edits onto occupied space are rejected, not stacked ---
+    void editsRejectOccupiedRanges() {
+        TimelineDataModel m;
+        auto push = [&](QUndoCommand* cmd) { m.undoStack()->push(cmd); };
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/a.mp4"), .start = 0, .length = 30}));
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/b.mp4"), .start = 30, .length = 30}));
+        const qint64 idA = m.clipsOnTrack(3).at(0).id;
+        const qint64 idB = m.clipsOnTrack(3).at(1).id;
+
+        // add overlapping A/B: rejected
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/c.mp4"), .start = 20, .length = 30}));
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);      // RED: silently stacked -> 3
+        QCOMPARE(m.sequenceLength(), qint64(60));
+
+        // move A onto occupied range (B at [30,60)): rejected, A unchanged
+        push(m.commandMoveClip(idA, 3, 20)); // [20,50) overlaps B
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);
+        QCOMPARE(m.clipById(idA)->start, qint64(0)); // RED: move corrupted the layout
+        QCOMPARE(m.clipById(idA)->length, qint64(30));
+
+        // move A to empty track at a free position: allowed
+        push(m.commandMoveClip(idA, 4, 100));
+        QCOMPARE(m.clipsOnTrack(3).size(), 1);
+        QCOMPARE(m.clipById(idA)->start, qint64(100));
+        QCOMPARE(m.clipById(idA)->length, qint64(30));
+
+        // undo of a REJECTED add must not remove anything (inert command)
+        TimelineDataModel m2;
+        m2.undoStack()->push(m2.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/a.mp4"), .start = 0, .length = 30}));
+        m2.undoStack()->push(m2.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/b.mp4"), .start = 20, .length = 30})); // rejected
+        m2.undoStack()->push(m2.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/z.mp4"), .start = 40, .length = 0}));  // degenerate
+        m2.undoStack()->undo(); // undoes the inert (degenerate) command
+        QCOMPARE(m2.clipsOnTrack(3).size(), 1);     // A must still be there
+        m2.undoStack()->undo(); // undoes the inert (rejected) command
+        QCOMPARE(m2.clipsOnTrack(3).size(), 1);     // A must STILL be there
+        m2.undoStack()->undo(); // undoes the real add
+        QCOMPARE(m2.clipsOnTrack(3).size(), 0);
+    }
 };
 
 QTEST_MAIN(TestTimeline)

@@ -64,6 +64,7 @@ public:
     void undo() override;
 private:
     int trackOf(qint64 id) const;
+    bool canPlace(int track, qint64 start) const;
     TimelineDataModel* m_m;
     qint64 m_id;
     int m_toTrack;

@@ -41,6 +41,8 @@ public:
     const Clip* clipAt(int track, qint64 frame) const;
     const Clip* clipById(qint64 id) const;
     bool rangeFree(int track, qint64 start, qint64 end) const;
+    // rangeFree ignoring the clip with the given id (move validation)
+    bool rangeFreeExcluding(int track, qint64 start, qint64 end, qint64 excludeClipId) const;
     QList<Clip> clipsOnTrack(int track) const { return m_tracks.at(track).clips; }
 
     // --- edit operations. Each returns a QUndoCommand the caller pushes.

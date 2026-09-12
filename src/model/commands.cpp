@@ -4,6 +4,12 @@
 namespace dovetail {
 
 void AddClipCommand::redo() {
+    // Premiere rule: never silently stack clips. First run may be rejected
+    // (target occupied or degenerate) -> inert command; later runs are
+    // re-dos after undo, where the space is free again.
+    if (m_clip.length <= 0) return;
+    if (!m_insertedId && !m_m->rangeFree(m_track, m_clip.start, m_clip.start + m_clip.length))
+        return;
     Clip c = m_clip;
     c.id = m_insertedId;             // 0 on first run -> model assigns; >0 on redo -> kept
     m_insertedId = m_m->insertClipRaw(m_track, c);
@@ -53,8 +59,23 @@ MoveClipCommand::MoveClipCommand(TimelineDataModel* m, qint64 clipId, int toTrac
     }
 }
 
-void MoveClipCommand::redo() { m_m->moveClipRaw(m_id, m_toTrack, m_newStart); }
-void MoveClipCommand::undo() { m_m->moveClipRaw(m_id, m_fromTrack, m_oldStart); }
+void MoveClipCommand::redo() {
+    if (!canPlace(m_toTrack, m_newStart)) return;
+    m_m->moveClipRaw(m_id, m_toTrack, m_newStart);
+}
+
+void MoveClipCommand::undo() {
+    if (!canPlace(m_fromTrack, m_oldStart)) return;
+    m_m->moveClipRaw(m_id, m_fromTrack, m_oldStart);
+}
+
+bool MoveClipCommand::canPlace(int track, qint64 start) const {
+    const Clip* c = m_m->clipById(m_id);
+    if (!c) return false;
+    if (track < 0 || track >= m_m->trackCount()) return false;
+    if (start < 0) return false;
+    return m_m->rangeFreeExcluding(track, start, start + c->length, m_id);
+}
 
 int MoveClipCommand::trackOf(qint64 id) const {
     // find owning track

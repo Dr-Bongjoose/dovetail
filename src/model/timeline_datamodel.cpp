@@ -41,8 +41,17 @@ Clip* TimelineDataModel::findClip(qint64 id) {
 }
 
 bool TimelineDataModel::rangeFree(int track, qint64 start, qint64 end) const {
+    if (track < 0 || track >= m_tracks.size()) return false;  // unplaceable
     for (const Clip& c : m_tracks.at(track).clips)
         if (clipOverlapsRange(c, start, end))
+            return false;
+    return true;
+}
+
+bool TimelineDataModel::rangeFreeExcluding(int track, qint64 start, qint64 end, qint64 excludeClipId) const {
+    if (track < 0 || track >= m_tracks.size()) return false;  // unplaceable
+    for (const Clip& c : m_tracks.at(track).clips)
+        if (c.id != excludeClipId && clipOverlapsRange(c, start, end))
             return false;
     return true;
 }
