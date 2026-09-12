@@ -16,7 +16,7 @@ jobs:
       - name: Install Qt (${{ env.QT_VERSION }})
         run: |
           pip install aqtinstall
-          aqt install-qt linux desktop "${QT_VERSION}" linux_gcc_64 --outputdir "$HOME/Qt"
+          aqt install-qt linux desktop "${QT_VERSION}" linux_gcc_64 --outputdir "$HOME/Qt" -m qtmultimedia
           echo "CMAKE_PREFIX_PATH=$HOME/Qt/${QT_VERSION}/gcc_64" >> "$GITHUB_ENV"
 
       - name: Install build deps
