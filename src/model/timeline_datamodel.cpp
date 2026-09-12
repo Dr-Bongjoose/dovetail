@@ -140,22 +140,28 @@ bool TimelineDataModel::rollEdgeRaw(int track, qint64 frame, qint64 delta) {
 }
 
 void TimelineDataModel::moveClipRaw(qint64 clipId, int toTrack, qint64 newStart) {
-    Clip* c = findClip(clipId);
-    if (!c) return;
-    // remove from old track, append to new (re-sorted)
+    if (toTrack < 0 || toTrack >= m_tracks.size()) return;  // invalid target: no-op
+    // Find by value and copy BEFORE removing — no pointers into the list survive removal.
     int fromTrack = -1;
+    Clip moved;
     for (int i = 0; i < m_tracks.size(); ++i) {
         auto& clips = m_tracks[i].clips;
-        for (int j = 0; j < clips.size(); ++j)
-            if (clips.at(j).id == clipId) { fromTrack = i; clips.removeAt(j); break; }
+        for (int j = 0; j < clips.size(); ++j) {
+            if (clips.at(j).id == clipId) {
+                fromTrack = i;
+                moved = clips.at(j);
+                clips.removeAt(j);
+                break;
+            }
+        }
         if (fromTrack >= 0) break;
     }
-    if (fromTrack < 0) return;
-    c->start = newStart;
+    if (fromTrack < 0) return;  // unknown clip: no-op
+    moved.start = newStart;
     auto& clips = m_tracks[toTrack].clips;
     int idx = 0;
-    while (idx < clips.size() && clips.at(idx).start < c->start) ++idx;
-    clips.insert(idx, *c);
+    while (idx < clips.size() && clips.at(idx).start < moved.start) ++idx;
+    clips.insert(idx, moved);
     emit layoutChanged();
 }
 

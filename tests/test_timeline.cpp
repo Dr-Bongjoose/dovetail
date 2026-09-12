@@ -65,6 +65,31 @@ private slots:
         QCOMPARE(m.clipsOnTrack(3).size(), 1);
         QCOMPARE(m.clipsOnTrack(3).at(0).length, qint64(90));
     }
+
+    // --- move: cross-track move + undo, invalid target is a no-op ---
+    void moveClipCrossTrackAndBack() {
+        TimelineDataModel m;
+        auto push = [&](QUndoCommand* cmd) { m.undoStack()->push(cmd); };
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/a.mp4"), .start = 0, .length = 30}));
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/b.mp4"), .start = 30, .length = 30}));
+        const qint64 id1 = m.clipsOnTrack(3).at(0).id;
+
+        push(m.commandMoveClip(id1, 4, 10)); // V1 -> V2 at frame 10
+        QCOMPARE(m.clipsOnTrack(3).size(), 1);
+        QCOMPARE(m.clipsOnTrack(4).size(), 1);
+        QCOMPARE(m.clipById(id1)->start, qint64(10));
+
+        m.undoStack()->undo();
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);
+        QCOMPARE(m.clipsOnTrack(4).size(), 0);
+        QCOMPARE(m.clipById(id1)->start, qint64(0));
+
+        // invalid target track: no crash, no change (RED: currently UB/crash)
+        push(m.commandMoveClip(id1, 99, 5));
+        QCOMPARE(m.trackCount(), 6);
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);
+        QCOMPARE(m.clipById(id1)->start, qint64(0));
+    }
 };
 
 QTEST_MAIN(TestTimeline)
