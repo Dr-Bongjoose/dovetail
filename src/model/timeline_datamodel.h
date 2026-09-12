@@ -54,8 +54,8 @@ public:
     QUndoStack* undoStack() { return &m_undo; }
 
     // Direct mutation — ONLY for command internals and tests. Not an edit API.
-    // Returns index of inserted clip on the track.
-    int insertClipRaw(int track, const Clip& c);
+    // Inserts c; if c.id == 0 a fresh id is assigned. Returns the id actually used.
+    qint64 insertClipRaw(int track, const Clip& c);
     bool removeClipRaw(int track, qint64 clipId);
     // Replace the entire contents of a track with the given clips
     // (sorted-by-start snapshot). Command undo support.

@@ -55,14 +55,17 @@ qint64 TimelineDataModel::sequenceLength() const {
     return len;
 }
 
-int TimelineDataModel::insertClipRaw(int track, const Clip& c) {
+qint64 TimelineDataModel::insertClipRaw(int track, const Clip& c) {
+    Clip copy = c;
+    if (copy.id == 0)
+        copy.id = m_nextClipId++;
     auto& clips = m_tracks[track].clips;
     // keep sorted by start
     int idx = 0;
-    while (idx < clips.size() && clips.at(idx).start < c.start) ++idx;
-    clips.insert(idx, c);
+    while (idx < clips.size() && clips.at(idx).start < copy.start) ++idx;
+    clips.insert(idx, copy);
     emit layoutChanged();
-    return idx;
+    return copy.id;
 }
 
 bool TimelineDataModel::removeClipRaw(int track, qint64 clipId) {

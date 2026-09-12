@@ -47,8 +47,6 @@ public:
     }
     void redo() override;
     void undo() override;
-    // called by model before rippleDeleteRaw mutates (see model hook)
-    void captureSnapshot(const QList<Clip>& snap) { m_snapshot = snap; }
 private:
     TimelineDataModel* m_m;
     int m_track;

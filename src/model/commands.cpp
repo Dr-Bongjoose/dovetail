@@ -5,14 +5,8 @@ namespace dovetail {
 
 void AddClipCommand::redo() {
     Clip c = m_clip;
-    if (m_insertedId) c.id = m_insertedId; else m_insertedId = 0;
-    m_m->insertClipRaw(m_track, c);
-    m_insertedId = m_m->clipsOnTrack(m_track).at(0).id; // ids preserved via redo/undo cycle
-    // Fix: find the inserted clip by its fields rather than index 0.
-    const auto& clips = m_m->clipsOnTrack(m_track);
-    for (const auto& x : clips)
-        if (x.start == c.start && x.length == c.length)
-            m_insertedId = x.id;
+    c.id = m_insertedId;             // 0 on first run -> model assigns; >0 on redo -> kept
+    m_insertedId = m_m->insertClipRaw(m_track, c);
 }
 
 void AddClipCommand::undo() {
@@ -54,15 +48,13 @@ void RazorCommand::mergeBack() {
 }
 
 void RippleDeleteCommand::redo() {
+    if (!m_removedId)  // first run only: snapshot pre-delete state for undo
+        m_snapshot = m_m->clipsOnTrack(m_track);
     m_removedId = m_m->rippleDeleteRaw(m_track, m_frame);
 }
 
 void RippleDeleteCommand::undo() {
     if (!m_removedId) return;
-    // Re-derive: undo of ripple-delete is complex because downstream
-    // clips shifted. Full-fidelity inverse requires capturing the
-    // track snapshot before deletion. Slice-1 simplification: snapshot
-    // the whole track in redo() BEFORE mutating, restore in undo().
     m_m->restoreTrackRaw(m_track, m_snapshot);
 }
 
