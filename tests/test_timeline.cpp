@@ -41,6 +41,30 @@ private slots:
         QCOMPARE(m.sequenceLength(), qint64(90));
         QCOMPARE(m.clipById(3)->start, qint64(60));  // C back at 60
     }
+
+    // --- razor: undo must restore the exact pre-split clip ---
+    void razorUndoRestoresClip() {
+        TimelineDataModel m;
+        auto push = [&](QUndoCommand* cmd) { m.undoStack()->push(cmd); };
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/a.mp4"), .sourceIn = 100, .start = 0, .length = 90}));
+        const qint64 origId = m.clipsOnTrack(3).at(0).id;
+
+        push(m.commandRazor(3, 40));
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);
+        QCOMPARE(m.clipsOnTrack(3).at(1).sourceIn, qint64(140)); // right continues source
+
+        m.undoStack()->undo();
+        QCOMPARE(m.clipsOnTrack(3).size(), 1);           // RED: mergeBack scan never finds left
+        QCOMPARE(m.clipsOnTrack(3).at(0).id, origId);    // identity preserved
+        QCOMPARE(m.clipsOnTrack(3).at(0).length, qint64(90));
+        QCOMPARE(m.clipsOnTrack(3).at(0).sourceIn, qint64(100));
+
+        m.undoStack()->redo();                            // undo/redo round-trip
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);
+        m.undoStack()->undo();
+        QCOMPARE(m.clipsOnTrack(3).size(), 1);
+        QCOMPARE(m.clipsOnTrack(3).at(0).length, qint64(90));
+    }
 };
 
 QTEST_MAIN(TestTimeline)

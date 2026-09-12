@@ -14,37 +14,23 @@ void AddClipCommand::undo() {
 }
 
 void RazorCommand::redo() {
+    if (!m_rightId) {
+        // First run: snapshot the left clip before razorRaw mutates it.
+        if (const Clip* c = m_m->clipAt(m_track, m_frame)) {
+            m_left = *c;
+            m_leftId = c->id;
+        }
+    }
     m_rightId = m_m->razorRaw(m_track, m_frame);
+    if (m_rightId)
+        m_right = *m_m->clipById(m_rightId);
 }
 
 void RazorCommand::undo() {
     if (!m_rightId) return;
-    // merge back: extend left clip, drop right clip
-    mergeBack();
-}
-
-void RazorCommand::mergeBack() {
-    const auto& clips = m_m->clipsOnTrack(m_track);
-    Clip left, right;
-    bool haveL = false, haveR = false;
-    for (const Clip& c : clips) {
-        if (c.id == m_rightId) { right = c; haveR = true; }
-        if (c.end() == right.start && haveR) { left = c; haveL = true; }
-    }
-    if (!haveL || !haveR) return;
-    // remove right, extend left
     m_m->removeClipRaw(m_track, m_rightId);
-    // direct mutation of left clip via re-insert
-    const auto& again = m_m->clipsOnTrack(m_track);
-    for (const Clip& c : again) {
-        if (c.id == left.id) {
-            Clip fixed = c;
-            fixed.length += right.length;
-            m_m->removeClipRaw(m_track, left.id);
-            m_m->insertClipRaw(m_track, fixed);
-            break;
-        }
-    }
+    m_m->removeClipRaw(m_track, m_leftId);
+    m_m->insertClipRaw(m_track, m_left);  // id preserved (non-zero): identity restored
 }
 
 void RippleDeleteCommand::redo() {

@@ -26,17 +26,19 @@ private:
 class RazorCommand : public QUndoCommand {
 public:
     RazorCommand(TimelineDataModel* m, int track, qint64 frame)
-        : m_m(m), m_track(track), m_frame(frame), m_rightId(0) {
+        : m_m(m), m_track(track), m_frame(frame) {
         setText(QStringLiteral("Razor"));
     }
     void redo() override;
     void undo() override;
 private:
-    void mergeBack();
     TimelineDataModel* m_m;
     int m_track;
     qint64 m_frame;
-    qint64 m_rightId;
+    qint64 m_leftId = 0;
+    qint64 m_rightId = 0;
+    Clip m_left;   // verbatim pre-razor clip; restored on undo
+    Clip m_right;  // post-razor right half; re-created on redo
 };
 
 class RippleDeleteCommand : public QUndoCommand {
