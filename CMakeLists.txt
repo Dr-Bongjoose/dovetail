@@ -35,6 +35,6 @@ qt_add_qml_module(dovetail
 enable_testing()
 qt_add_executable(test_timeline tests/test_timeline.cpp
     src/model/timeline_datamodel.cpp src/model/commands.cpp)
-target_include_directories(test_timeline PRIVATE src)
+target_include_directories(test_timeline PRIVATE src src/model)
 target_link_libraries(test_timeline PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
 add_test(NAME timeline COMMAND test_timeline)

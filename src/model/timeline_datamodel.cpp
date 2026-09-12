@@ -1,5 +1,7 @@
 #include "timeline_datamodel.h"
 
+#include "commands.h"
+
 #include <algorithm>
 
 namespace dovetail {
@@ -15,6 +17,7 @@ TimelineDataModel::TimelineDataModel(QObject* parent) : QObject(parent) {
 }
 
 const Clip* TimelineDataModel::clipAt(int track, qint64 frame) const {
+    if (track < 0 || track >= m_tracks.size()) return nullptr;
     const auto& clips = m_tracks.at(track).clips;
     for (const Clip& c : clips)
         if (frame >= c.start && frame < c.end())
@@ -39,8 +42,17 @@ Clip* TimelineDataModel::findClip(qint64 id) {
 }
 
 bool TimelineDataModel::rangeFree(int track, qint64 start, qint64 end) const {
+    if (track < 0 || track >= m_tracks.size()) return false;  // unplaceable
     for (const Clip& c : m_tracks.at(track).clips)
         if (clipOverlapsRange(c, start, end))
+            return false;
+    return true;
+}
+
+bool TimelineDataModel::rangeFreeExcluding(int track, qint64 start, qint64 end, qint64 excludeClipId) const {
+    if (track < 0 || track >= m_tracks.size()) return false;  // unplaceable
+    for (const Clip& c : m_tracks.at(track).clips)
+        if (c.id != excludeClipId && clipOverlapsRange(c, start, end))
             return false;
     return true;
 }
@@ -53,14 +65,17 @@ qint64 TimelineDataModel::sequenceLength() const {
     return len;
 }
 
-int TimelineDataModel::insertClipRaw(int track, const Clip& c) {
+qint64 TimelineDataModel::insertClipRaw(int track, const Clip& c) {
+    Clip copy = c;
+    if (copy.id == 0 || clipById(copy.id) != nullptr)  // fresh or caller-supplied-but-live
+        copy.id = m_nextClipId++;
     auto& clips = m_tracks[track].clips;
     // keep sorted by start
     int idx = 0;
-    while (idx < clips.size() && clips.at(idx).start < c.start) ++idx;
-    clips.insert(idx, c);
+    while (idx < clips.size() && clips.at(idx).start < copy.start) ++idx;
+    clips.insert(idx, copy);
     emit layoutChanged();
-    return idx;
+    return copy.id;
 }
 
 bool TimelineDataModel::removeClipRaw(int track, qint64 clipId) {
@@ -73,6 +88,12 @@ bool TimelineDataModel::removeClipRaw(int track, qint64 clipId) {
         }
     }
     return false;
+}
+
+void TimelineDataModel::restoreTrackRaw(int track, const QList<Clip>& clips) {
+    if (track < 0 || track >= m_tracks.size()) return;
+    m_tracks[track].clips = clips;
+    emit layoutChanged();
 }
 
 qint64 TimelineDataModel::razorRaw(int track, qint64 frame) {
@@ -91,6 +112,7 @@ qint64 TimelineDataModel::razorRaw(int track, qint64 frame) {
 }
 
 qint64 TimelineDataModel::rippleDeleteRaw(int track, qint64 frame) {
+    if (track < 0 || track >= m_tracks.size()) return 0;
     const Clip* c = clipAt(track, frame);
     if (!c) return 0;
     qint64 id = c->id;
@@ -106,6 +128,7 @@ qint64 TimelineDataModel::rippleDeleteRaw(int track, qint64 frame) {
 }
 
 bool TimelineDataModel::rollEdgeRaw(int track, qint64 frame, qint64 delta) {
+    if (track < 0 || track >= m_tracks.size()) return false;
     // Find boundary: end of left clip == start of right clip == frame
     Clip* left = nullptr;
     Clip* right = nullptr;
@@ -130,22 +153,28 @@ bool TimelineDataModel::rollEdgeRaw(int track, qint64 frame, qint64 delta) {
 }
 
 void TimelineDataModel::moveClipRaw(qint64 clipId, int toTrack, qint64 newStart) {
-    Clip* c = findClip(clipId);
-    if (!c) return;
-    // remove from old track, append to new (re-sorted)
+    if (toTrack < 0 || toTrack >= m_tracks.size()) return;  // invalid target: no-op
+    // Find by value and copy BEFORE removing — no pointers into the list survive removal.
     int fromTrack = -1;
+    Clip moved;
     for (int i = 0; i < m_tracks.size(); ++i) {
         auto& clips = m_tracks[i].clips;
-        for (int j = 0; j < clips.size(); ++j)
-            if (clips.at(j).id == clipId) { fromTrack = i; clips.removeAt(j); break; }
+        for (int j = 0; j < clips.size(); ++j) {
+            if (clips.at(j).id == clipId) {
+                fromTrack = i;
+                moved = clips.at(j);
+                clips.removeAt(j);
+                break;
+            }
+        }
         if (fromTrack >= 0) break;
     }
-    if (fromTrack < 0) return;
-    c->start = newStart;
+    if (fromTrack < 0) return;  // unknown clip: no-op
+    moved.start = newStart;
     auto& clips = m_tracks[toTrack].clips;
     int idx = 0;
-    while (idx < clips.size() && clips.at(idx).start < c->start) ++idx;
-    clips.insert(idx, *c);
+    while (idx < clips.size() && clips.at(idx).start < moved.start) ++idx;
+    clips.insert(idx, moved);
     emit layoutChanged();
 }
 
@@ -162,6 +191,10 @@ QUndoCommand* TimelineDataModel::commandRippleDelete(int track, qint64 frame) {
 }
 QUndoCommand* TimelineDataModel::commandMoveClip(qint64 clipId, int toTrack, qint64 newStart) {
     return new MoveClipCommand(this, clipId, toTrack, newStart);
+}
+
+QUndoCommand* TimelineDataModel::commandRollEdge(int track, qint64 frame, qint64 delta) {
+    return new RollEdgeCommand(this, track, frame, delta);
 }
 
 void TimelineDataModel::addTrack(TrackType type, const QString& name) {

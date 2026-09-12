@@ -41,6 +41,8 @@ public:
     const Clip* clipAt(int track, qint64 frame) const;
     const Clip* clipById(qint64 id) const;
     bool rangeFree(int track, qint64 start, qint64 end) const;
+    // rangeFree ignoring the clip with the given id (move validation)
+    bool rangeFreeExcluding(int track, qint64 start, qint64 end, qint64 excludeClipId) const;
     QList<Clip> clipsOnTrack(int track) const { return m_tracks.at(track).clips; }
 
     // --- edit operations. Each returns a QUndoCommand the caller pushes.
@@ -54,9 +56,12 @@ public:
     QUndoStack* undoStack() { return &m_undo; }
 
     // Direct mutation — ONLY for command internals and tests. Not an edit API.
-    // Returns index of inserted clip on the track.
-    int insertClipRaw(int track, const Clip& c);
+    // Inserts c; if c.id == 0 a fresh id is assigned. Returns the id actually used.
+    qint64 insertClipRaw(int track, const Clip& c);
     bool removeClipRaw(int track, qint64 clipId);
+    // Replace the entire contents of a track with the given clips
+    // (sorted-by-start snapshot). Command undo support.
+    void restoreTrackRaw(int track, const QList<Clip>& clips);
     // Split the clip under (track, frame) into two. Returns new right clip id, 0 if none.
     qint64 razorRaw(int track, qint64 frame);
     // Delete clip at frame and shift everything to its right left by its length.
