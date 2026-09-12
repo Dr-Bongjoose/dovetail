@@ -1,0 +1,63 @@
+# Build
+build/
+build-*/
+cmake-build-*/
+out/
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+install_manifest.txt
+
+# C++ object/artifact files
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.app/
+
+# Qt
+*.qm
+*.pro.user*
+.qtc_clangd/
+*.autosave
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+.cache/
+compile_commands.json
+.clangd/
+
+# OS
+.DS_Store
+.directory
+
+# Media test files — never commit binary media
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.prores
+*.braw
+*.wav
+*.aiff
+*.mp3
+*.flac
+*.aac
+*.mxf
+
+# Proxy caches
+proxies/
+*.cflex
