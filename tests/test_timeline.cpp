@@ -90,6 +90,35 @@ private slots:
         QCOMPARE(m.clipsOnTrack(3).size(), 2);
         QCOMPARE(m.clipById(id1)->start, qint64(0));
     }
+
+    // --- roll: rejected edit mutates nothing; undo restores pre-roll state ---
+    void rollEdgeValidateThenMutate() {
+        TimelineDataModel m;
+        auto push = [&](QUndoCommand* cmd) { m.undoStack()->push(cmd); };
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/a.mp4"), .sourceIn = 0, .start = 0, .length = 40}));
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/b.mp4"), .sourceIn = 30, .start = 40, .length = 50}));
+        const qint64 idA = m.clipsOnTrack(3).at(0).id;
+        const qint64 idB = m.clipsOnTrack(3).at(1).id;
+
+        // rejected: rolling boundary 40 by +60 runs B past its own end
+        push(m.commandRollEdge(3, 40, 60));
+        QCOMPARE(m.clipById(idA)->length, qint64(40));  // RED: left was extended before right rejected
+        QCOMPARE(m.clipById(idB)->start, qint64(40));
+        QCOMPARE(m.clipById(idB)->length, qint64(50));
+        QCOMPARE(m.clipById(idB)->sourceIn, qint64(30));
+
+        // accepted roll, then undo
+        push(m.commandRollEdge(3, 40, 10));
+        QCOMPARE(m.clipById(idA)->length, qint64(50));
+        QCOMPARE(m.clipById(idB)->start, qint64(50));
+        QCOMPARE(m.clipById(idB)->sourceIn, qint64(40)); // source follows the edge
+
+        m.undoStack()->undo();
+        QCOMPARE(m.clipById(idA)->length, qint64(40));
+        QCOMPARE(m.clipById(idB)->start, qint64(40));
+        QCOMPARE(m.clipById(idB)->length, qint64(50));
+        QCOMPARE(m.clipById(idB)->sourceIn, qint64(30));
+    }
 };
 
 QTEST_MAIN(TestTimeline)

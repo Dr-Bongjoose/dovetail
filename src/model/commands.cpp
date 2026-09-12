@@ -64,4 +64,31 @@ int MoveClipCommand::trackOf(qint64 id) const {
     return 0;
 }
 
+RollEdgeCommand::RollEdgeCommand(TimelineDataModel* m, int track, qint64 frame, qint64 delta)
+    : m_m(m), m_track(track), m_frame(frame), m_delta(delta) {
+    setText(QStringLiteral("Roll Edge"));
+    if (track < 0 || track >= m->trackCount()) return;
+    // capture both neighbors of the boundary now, ids frozen for undo
+    for (const Clip& c : m->clipsOnTrack(track)) {
+        if (c.end() == frame) { m_left = c; m_leftId = c.id; }
+        if (c.start == frame) { m_right = c; m_rightId = c.id; }
+    }
+}
+
+void RollEdgeCommand::redo() {
+    m_applied = m_m->rollEdgeRaw(m_track, m_frame, m_delta);
+    if (!m_applied && (m_leftId || m_rightId)) {
+        // rollEdgeRaw validated too late: restore whatever it touched
+        if (m_leftId)  { m_m->removeClipRaw(m_track, m_leftId);  m_m->insertClipRaw(m_track, m_left); }
+        if (m_rightId) { m_m->removeClipRaw(m_track, m_rightId); m_m->insertClipRaw(m_track, m_right); }
+        m_applied = false;
+    }
+}
+
+void RollEdgeCommand::undo() {
+    if (!m_applied) return;
+    if (m_leftId)  { m_m->removeClipRaw(m_track, m_leftId);  m_m->insertClipRaw(m_track, m_left); }
+    if (m_rightId) { m_m->removeClipRaw(m_track, m_rightId); m_m->insertClipRaw(m_track, m_right); }
+}
+
 } // namespace dovetail

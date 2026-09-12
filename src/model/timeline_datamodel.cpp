@@ -180,6 +180,10 @@ QUndoCommand* TimelineDataModel::commandMoveClip(qint64 clipId, int toTrack, qin
     return new MoveClipCommand(this, clipId, toTrack, newStart);
 }
 
+QUndoCommand* TimelineDataModel::commandRollEdge(int track, qint64 frame, qint64 delta) {
+    return new RollEdgeCommand(this, track, frame, delta);
+}
+
 void TimelineDataModel::addTrack(TrackType type, const QString& name) {
     m_tracks.append(defaultTrack(type, name));
     emit layoutChanged();

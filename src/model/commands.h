@@ -72,4 +72,21 @@ private:
     qint64 m_oldStart = 0;
 };
 
+class RollEdgeCommand : public QUndoCommand {
+public:
+    RollEdgeCommand(TimelineDataModel* m, int track, qint64 frame, qint64 delta);
+    void redo() override;
+    void undo() override;
+private:
+    TimelineDataModel* m_m;
+    int m_track;
+    qint64 m_frame;
+    qint64 m_delta;
+    qint64 m_leftId = 0;
+    qint64 m_rightId = 0;
+    Clip m_left;    // pre-roll snapshots for exact restore
+    Clip m_right;
+    bool m_applied = false;
+};
+
 } // namespace dovetail
