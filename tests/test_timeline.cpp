@@ -133,6 +133,14 @@ private slots:
         QCOMPARE(m.clipAt(99, 5), nullptr);
         QCOMPARE(m.rangeFree(99, 0, 10), false);
 
+        // duplicate id insert: rejected with a fresh id assigned (no corruption)
+        Clip dup = *m.clipById(idA);
+        const qint64 newId = m.insertClipRaw(4, dup);
+        QVERIFY(newId != idA);                 // must not reuse the live id
+        QVERIFY(m.clipById(newId) != nullptr);
+        QCOMPARE(m.clipsOnTrack(3).size(), 1); // A untouched
+        QCOMPARE(m.clipsOnTrack(4).size(), 1);
+
         // valid inputs still work after the noise
         QCOMPARE(m.razorRaw(3, 15) != 0, true);
         QCOMPARE(m.clipsOnTrack(3).size(), 2);

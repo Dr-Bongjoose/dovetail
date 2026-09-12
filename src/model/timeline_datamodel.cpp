@@ -67,7 +67,7 @@ qint64 TimelineDataModel::sequenceLength() const {
 
 qint64 TimelineDataModel::insertClipRaw(int track, const Clip& c) {
     Clip copy = c;
-    if (copy.id == 0)
+    if (copy.id == 0 || clipById(copy.id) != nullptr)  // fresh or caller-supplied-but-live
         copy.id = m_nextClipId++;
     auto& clips = m_tracks[track].clips;
     // keep sorted by start
