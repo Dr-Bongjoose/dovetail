@@ -57,6 +57,9 @@ public:
     // Returns index of inserted clip on the track.
     int insertClipRaw(int track, const Clip& c);
     bool removeClipRaw(int track, qint64 clipId);
+    // Replace the entire contents of a track with the given clips
+    // (sorted-by-start snapshot). Command undo support.
+    void restoreTrackRaw(int track, const QList<Clip>& clips);
     // Split the clip under (track, frame) into two. Returns new right clip id, 0 if none.
     qint64 razorRaw(int track, qint64 frame);
     // Delete clip at frame and shift everything to its right left by its length.

@@ -1,5 +1,7 @@
 #include "timeline_datamodel.h"
 
+#include "commands.h"
+
 #include <algorithm>
 
 namespace dovetail {
@@ -73,6 +75,11 @@ bool TimelineDataModel::removeClipRaw(int track, qint64 clipId) {
         }
     }
     return false;
+}
+
+void TimelineDataModel::restoreTrackRaw(int track, const QList<Clip>& clips) {
+    m_tracks[track].clips = clips;
+    emit layoutChanged();
 }
 
 qint64 TimelineDataModel::razorRaw(int track, qint64 frame) {
