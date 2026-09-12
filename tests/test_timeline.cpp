@@ -120,7 +120,51 @@ private slots:
         QCOMPARE(m.clipById(idB)->sourceIn, qint64(30));
     }
 
-    // --- validation: edits onto occupied space are rejected, not stacked ---
+    // --- raw ops are total: out-of-range track / unknown clip are safe no-ops ---
+    void rawOpsRejectInvalidInputs() {
+        TimelineDataModel m;
+        auto push = [&](QUndoCommand* cmd) { m.undoStack()->push(cmd); };
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/a.mp4"), .start = 0, .length = 30}));
+        const qint64 idA = m.clipsOnTrack(3).at(0).id;
+
+        QCOMPARE(m.razorRaw(99, 5), qint64(0));        // RED: at() throws
+        QCOMPARE(m.rippleDeleteRaw(99, 5), qint64(0)); // RED: at() throws
+        QCOMPARE(m.rollEdgeRaw(99, 5, 1), false);      // RED: operator[] UB
+        QCOMPARE(m.clipAt(99, 5), nullptr);
+        QCOMPARE(m.rangeFree(99, 0, 10), false);
+
+        // valid inputs still work after the noise
+        QCOMPARE(m.razorRaw(3, 15) != 0, true);
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);
+        Q_UNUSED(idA);
+    }
+
+    // --- integration: a full edit sequence unwinds to the pristine state ---
+    void editSequenceRoundTrips() {
+        TimelineDataModel m;
+        auto push = [&](QUndoCommand* cmd) { m.undoStack()->push(cmd); };
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/a.mp4"), .sourceIn = 200, .start = 0, .length = 90}));
+        push(m.commandAddClip(3, Clip{.sourcePath = QStringLiteral("/b.mp4"), .sourceIn = 10, .start = 90, .length = 40}));
+        const qint64 idA = m.clipsOnTrack(3).at(0).id;
+        const Clip pristineA = m.clipsOnTrack(3).at(0);
+
+        push(m.commandRazor(3, 40));
+        push(m.commandRollEdge(3, 40, 10));
+        push(m.commandMoveClip(m.clipsOnTrack(3).at(1).id, 4, 500));
+        push(m.commandRippleDelete(3, 100));
+        // B deleted; A2 now lives at [500,540) on track 4 -> sequence end 540
+        QCOMPARE(m.sequenceLength(), qint64(540));
+
+        for (int i = 0; i < 4; ++i) m.undoStack()->undo();
+        QCOMPARE(m.clipsOnTrack(3).size(), 2);
+        QCOMPARE(m.clipsOnTrack(4).size(), 0);
+        const Clip* a = m.clipById(idA);
+        QVERIFY(a != nullptr);
+        QCOMPARE(a->start, pristineA.start);
+        QCOMPARE(a->length, pristineA.length);
+        QCOMPARE(a->sourceIn, pristineA.sourceIn);
+        QCOMPARE(m.sequenceLength(), qint64(130));
+    }
     void editsRejectOccupiedRanges() {
         TimelineDataModel m;
         auto push = [&](QUndoCommand* cmd) { m.undoStack()->push(cmd); };

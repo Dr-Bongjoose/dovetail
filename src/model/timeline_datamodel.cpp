@@ -17,6 +17,7 @@ TimelineDataModel::TimelineDataModel(QObject* parent) : QObject(parent) {
 }
 
 const Clip* TimelineDataModel::clipAt(int track, qint64 frame) const {
+    if (track < 0 || track >= m_tracks.size()) return nullptr;
     const auto& clips = m_tracks.at(track).clips;
     for (const Clip& c : clips)
         if (frame >= c.start && frame < c.end())
@@ -90,6 +91,7 @@ bool TimelineDataModel::removeClipRaw(int track, qint64 clipId) {
 }
 
 void TimelineDataModel::restoreTrackRaw(int track, const QList<Clip>& clips) {
+    if (track < 0 || track >= m_tracks.size()) return;
     m_tracks[track].clips = clips;
     emit layoutChanged();
 }
@@ -110,6 +112,7 @@ qint64 TimelineDataModel::razorRaw(int track, qint64 frame) {
 }
 
 qint64 TimelineDataModel::rippleDeleteRaw(int track, qint64 frame) {
+    if (track < 0 || track >= m_tracks.size()) return 0;
     const Clip* c = clipAt(track, frame);
     if (!c) return 0;
     qint64 id = c->id;
@@ -125,6 +128,7 @@ qint64 TimelineDataModel::rippleDeleteRaw(int track, qint64 frame) {
 }
 
 bool TimelineDataModel::rollEdgeRaw(int track, qint64 frame, qint64 delta) {
+    if (track < 0 || track >= m_tracks.size()) return false;
     // Find boundary: end of left clip == start of right clip == frame
     Clip* left = nullptr;
     Clip* right = nullptr;
